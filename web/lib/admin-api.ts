@@ -76,3 +76,24 @@ export async function createUser(
   }
   return (await res.json()) as CreatedUser;
 }
+
+export interface UserDataOverview {
+  user_id: string;
+  username: string;
+  sessions: Array<{
+    id?: string;
+    session_id?: string;
+    title?: string;
+    updated_at?: string;
+    messages: Array<{ role: string; content: string; created_at?: string }>;
+  }>;
+  files: Array<{ path: string; size: number; modified_at: number }>;
+}
+
+export async function getUserData(userId: string): Promise<UserDataOverview> {
+  const res = await apiFetch(
+    apiUrl(`/api/v1/multi-user/users/${encodeURIComponent(userId)}/data`),
+  );
+  if (!res.ok) throw new Error("Failed to load user data");
+  return res.json();
+}

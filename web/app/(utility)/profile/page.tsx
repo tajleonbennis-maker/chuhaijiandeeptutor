@@ -4,10 +4,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createElement } from "react";
-import { ArrowLeft, ImageUp, LogOut, ShieldCheck, Trash2 } from "lucide-react";
+import { ArrowLeft, ImageUp, KeyRound, LogOut, ShieldCheck, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { fetchAuthStatus, logout } from "@/lib/auth";
 import {
+  changePassword,
   getProfile,
   removeAvatarImage,
   setAvatarMarker,
@@ -101,6 +102,10 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordMessage, setPasswordMessage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -181,6 +186,31 @@ export default function ProfilePage() {
     await logout();
     router.replace("/login");
   }, [router]);
+
+  const handleChangePassword = useCallback(async () => {
+    setError(null);
+    setPasswordMessage(null);
+    if (newPassword.length < 8) {
+      setError(t("Password must be at least 8 characters"));
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError(t("Passwords do not match"));
+      return;
+    }
+    setBusy(true);
+    try {
+      await changePassword(currentPassword, newPassword);
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setPasswordMessage(t("Password changed successfully"));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }, [confirmPassword, currentPassword, newPassword, t]);
 
   const descriptor = parseAvatarMarker(profile?.avatar);
   const hasImage = descriptor.kind === "image";
@@ -271,6 +301,58 @@ export default function ProfilePage() {
                     </p>
                   )}
                 </div>
+              </div>
+            </div>
+
+            {/* Password card */}
+            <div className="mt-4 rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-sm">
+              <div className="flex items-center gap-2">
+                <KeyRound size={16} />
+                <h2 className="text-sm font-semibold text-[var(--foreground)]">
+                  {t("Change password")}
+                </h2>
+              </div>
+              <p className="mt-1 text-sm text-[var(--muted-foreground)]">
+                {t("Replace the default password after your first login")}
+              </p>
+              <div className="mt-4 grid gap-3">
+                <input
+                  type="password"
+                  autoComplete="current-password"
+                  value={currentPassword}
+                  onChange={(event) => setCurrentPassword(event.target.value)}
+                  placeholder={t("Current password")}
+                  className="rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--foreground)]/40"
+                />
+                <input
+                  type="password"
+                  autoComplete="new-password"
+                  value={newPassword}
+                  onChange={(event) => setNewPassword(event.target.value)}
+                  placeholder={t("New password")}
+                  className="rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--foreground)]/40"
+                />
+                <input
+                  type="password"
+                  autoComplete="new-password"
+                  value={confirmPassword}
+                  onChange={(event) => setConfirmPassword(event.target.value)}
+                  placeholder={t("Confirm password")}
+                  className="rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--foreground)]/40"
+                />
+                {passwordMessage && (
+                  <p className="text-sm text-emerald-600 dark:text-emerald-400">
+                    {passwordMessage}
+                  </p>
+                )}
+                <button
+                  type="button"
+                  disabled={busy || !currentPassword || !newPassword || !confirmPassword}
+                  onClick={() => void handleChangePassword()}
+                  className="w-fit rounded-lg bg-[var(--foreground)] px-4 py-2 text-sm font-medium text-[var(--background)] disabled:opacity-50"
+                >
+                  {t("Update password")}
+                </button>
               </div>
             </div>
 

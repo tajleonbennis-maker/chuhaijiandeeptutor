@@ -36,9 +36,11 @@ import logging
 import re
 from typing import Literal
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+
+from deeptutor.api.routers.auth import require_admin
 
 from deeptutor.services.memory import (
     L3_SLOTS,
@@ -611,7 +613,7 @@ async def get_doc_lines(layer: str, key: str):
 # ── Settings ────────────────────────────────────────────────────────────
 
 
-@router.get("/settings")
+@router.get("/settings", dependencies=[Depends(require_admin)])
 async def get_memory_settings_endpoint():
     """Return the current ``memory:`` subtree (defaults merged in)."""
     from deeptutor.services.memory.settings import memory_settings_dict
@@ -619,7 +621,7 @@ async def get_memory_settings_endpoint():
     return memory_settings_dict()
 
 
-@router.put("/settings")
+@router.put("/settings", dependencies=[Depends(require_admin)])
 async def put_memory_settings(payload: dict):
     """Merge the payload into the ``memory:`` subtree and persist."""
     from deeptutor.services.memory.settings import (

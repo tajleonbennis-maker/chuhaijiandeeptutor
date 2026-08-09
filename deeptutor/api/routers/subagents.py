@@ -298,7 +298,7 @@ async def message_connection(name: str, payload: SubagentMessageRequest):
     return StreamingResponse(event_stream(), media_type="application/x-ndjson")
 
 
-@router.get("/settings")
+@router.get("/settings", dependencies=[Depends(require_admin)])
 async def get_settings():
     """Read the consult budget and per-backend run config."""
     return load_subagent_settings().to_dict()

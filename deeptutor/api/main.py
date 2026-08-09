@@ -375,6 +375,9 @@ app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
 # All other routers require a valid session when AUTH_ENABLED=true.
 # require_auth is a no-op when AUTH_ENABLED=false, so this is safe for local use.
 from deeptutor.api.routers.auth import require_admin, require_auth  # noqa: E402
+from deeptutor.services.auth import ensure_bootstrap_admin  # noqa: E402
+
+ensure_bootstrap_admin()
 
 _auth = [Depends(require_auth)]
 # Partner data is anchored at the admin workspace (data/partners) and shared

@@ -20,7 +20,7 @@ from deeptutor.services.config.model_catalog import ModelCatalogService
 from deeptutor.services.model_selection import list_llm_options
 
 from .context import get_current_user
-from .grants import load_grant
+from .grants import grant_path, load_grant
 from .paths import get_admin_path_service
 
 
@@ -56,6 +56,33 @@ def is_owner_bound(profile: dict[str, Any]) -> bool:
     return bool(profile.get("owner_bound"))
 
 
+def _is_guest_id(user_id: str) -> bool:
+    return user_id.startswith("guest_")
+
+
+def _guest_model_access(catalog: dict[str, Any]) -> list[dict[str, Any]]:
+    """Expose usable model identities to guests without provider configuration."""
+    rows: list[dict[str, Any]] = []
+    for profile in catalog.get("services", {}).get("llm", {}).get("profiles", []) or []:
+        if is_owner_bound(profile):
+            continue
+        profile_id = str(profile.get("id") or "")
+        for model in profile.get("models", []) or []:
+            model_id = str(model.get("id") or "")
+            if profile_id and model_id:
+                rows.append(
+                    {
+                        "profile_id": profile_id,
+                        "model_id": model_id,
+                        "name": model.get("name") or model.get("model") or model_id,
+                        "model": model.get("model") or "",
+                        "source": "guest",
+                        "available": True,
+                    }
+                )
+    return rows
+
+
 def redacted_model_access(user_id: str | None = None) -> dict[str, list[dict[str, Any]]]:
     user = get_current_user()
     if user_id is None:
@@ -63,6 +90,13 @@ def redacted_model_access(user_id: str | None = None) -> dict[str, list[dict[str
     grant = load_grant(user_id)
     catalog = admin_catalog()
     result: dict[str, list[dict[str, Any]]] = {"llm": []}
+    # Guests and newly self-registered accounts inherit the deployment's
+    # shared (non-owner-bound) models. As soon as an administrator saves an
+    # explicit grant, that grant becomes authoritative — including an empty
+    # grant used to revoke model access.
+    if _is_guest_id(user_id) or not grant_path(user_id).exists():
+        result["llm"] = _guest_model_access(catalog)
+        return result
     for item in grant.get("models", {}).get("llm", []) or []:
         profile_id = str(item.get("profile_id") or item.get("id") or "")
         profile = _profile_by_id(catalog, "llm", profile_id)

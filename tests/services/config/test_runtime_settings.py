@@ -233,7 +233,10 @@ def test_startup_ensure_creates_missing_runtime_jsons_with_defaults(
     assert _parsing_file["version"] == 2
     assert _parsing_file["engines"]["mineru"]["mode"] == "local"
     assert _read_json(settings_dir / "system.json")["backend_port"] == 8001
-    assert _read_json(settings_dir / "auth.json")["enabled"] is False
+    auth = _read_json(settings_dir / "auth.json")
+    assert auth["enabled"] is True
+    assert auth["username"] == "admin"
+    assert auth["password_hash"].startswith("$2b$")
     assert _read_json(settings_dir / "integrations.json")["pocketbase_url"] == ""
     assert set(_read_json(settings_dir / "model_catalog.json")["services"]) == {
         "llm",

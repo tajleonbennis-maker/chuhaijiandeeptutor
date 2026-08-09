@@ -18,7 +18,7 @@ from .grants import load_grant, save_grant
 from .identity import get_user_by_id, list_user_info
 from .knowledge_access import admin_kb_base_dir
 from .model_access import is_owner_bound
-from .paths import get_admin_path_service
+from .paths import get_admin_path_service, get_path_service_for_scope, scope_for_user
 
 router = APIRouter()
 
@@ -136,6 +136,54 @@ async def admin_resources(_: object = Depends(require_admin)) -> dict[str, Any]:
 async def get_user_grants(user_id: str, _: object = Depends(require_admin)) -> dict[str, Any]:
     _require_assignable_user(user_id)
     return {"grant": load_grant(user_id)}
+
+
+@router.get("/users/{user_id}/data")
+async def get_user_data(user_id: str, _: object = Depends(require_admin)) -> dict[str, Any]:
+    """Read-only overview of a user's retained chats and generated files."""
+    username, _record = _require_assignable_user(user_id)
+    path_service = get_path_service_for_scope(scope_for_user(user_id, is_admin=False))
+    db_path = path_service.get_chat_history_db()
+    sessions: list[dict[str, Any]] = []
+    if db_path.exists():
+        from deeptutor.services.session.sqlite_store import SQLiteSessionStore
+
+        store = SQLiteSessionStore(db_path=db_path)
+        for summary in await store.list_sessions(limit=50, offset=0):
+            session_id = str(summary.get("id") or summary.get("session_id") or "")
+            detail = await store.get_session_with_messages(session_id) if session_id else None
+            messages = []
+            for message in (detail or {}).get("messages", [])[-20:]:
+                content = str(message.get("content") or "")
+                messages.append(
+                    {
+                        "role": message.get("role") or "",
+                        "content": content[:2000],
+                        "created_at": message.get("created_at") or "",
+                    }
+                )
+            sessions.append({**summary, "messages": messages})
+
+    workspace = path_service.get_workspace_dir()
+    files: list[dict[str, Any]] = []
+    if workspace.exists():
+        for item in sorted(workspace.rglob("*")):
+            if not item.is_file() or item.name.startswith("."):
+                continue
+            try:
+                stat = item.stat()
+                files.append(
+                    {
+                        "path": str(item.relative_to(workspace)),
+                        "size": stat.st_size,
+                        "modified_at": int(stat.st_mtime),
+                    }
+                )
+            except OSError:
+                continue
+            if len(files) >= 200:
+                break
+    return {"user_id": user_id, "username": username, "sessions": sessions, "files": files}
 
 
 @router.put("/users/{user_id}/grants")

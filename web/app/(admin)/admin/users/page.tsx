@@ -9,6 +9,8 @@ import {
   deleteUser,
   setUserRole,
   createUser,
+  getUserData,
+  type UserDataOverview,
   type UserRecord,
 } from "@/lib/admin-api";
 import { GrantEditor } from "@/features/multi-user/components/GrantEditor";
@@ -26,6 +28,7 @@ import {
   SlidersHorizontal,
   UserPlus,
   Users,
+  FolderOpen,
   X,
 } from "lucide-react";
 import Link from "next/link";
@@ -53,6 +56,9 @@ export default function AdminUsersPage() {
   const [error, setError] = useState("");
   const [actionError, setActionError] = useState("");
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
+  const [dataUserId, setDataUserId] = useState<string | null>(null);
+  const [userData, setUserData] = useState<UserDataOverview | null>(null);
+  const [userDataLoading, setUserDataLoading] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [query, setQuery] = useState("");
   const [confirmTarget, setConfirmTarget] = useState<{
@@ -103,6 +109,25 @@ export default function AdminUsersPage() {
   function closeCreateDialog() {
     if (createSubmitting) return;
     setShowCreateDialog(false);
+  }
+
+  async function toggleUserData(user: UserRecord) {
+    if (dataUserId === user.id) {
+      setDataUserId(null);
+      setUserData(null);
+      return;
+    }
+    setDataUserId(user.id);
+    setUserData(null);
+    setUserDataLoading(true);
+    setActionError("");
+    try {
+      setUserData(await getUserData(user.id));
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : t("Failed to load user data"));
+    } finally {
+      setUserDataLoading(false);
+    }
   }
 
   async function handleCreateSubmit(event: React.FormEvent) {
@@ -391,6 +416,15 @@ export default function AdminUsersPage() {
                           <div className="flex items-center justify-end gap-1.5">
                             {canManageAssignments && (
                               <button
+                                onClick={() => void toggleUserData(user)}
+                                title={t("View user data")}
+                                className="rounded-lg p-1.5 text-[var(--muted-foreground)] hover:bg-[var(--background)] hover:text-[var(--foreground)] transition-colors"
+                              >
+                                <FolderOpen size={15} />
+                              </button>
+                            )}
+                            {canManageAssignments && (
+                              <button
                                 onClick={() =>
                                   setExpandedUserId((current) =>
                                     current === user.id ? null : user.id,
@@ -454,6 +488,55 @@ export default function AdminUsersPage() {
                         <tr>
                           <td colSpan={4} className="p-0">
                             <GrantEditor key={user.id} userId={user.id} />
+                          </td>
+                        </tr>
+                      )}
+                      {canManageAssignments && dataUserId === user.id && (
+                        <tr>
+                          <td colSpan={4} className="bg-[var(--background)]/40 p-5">
+                            {userDataLoading ? (
+                              <p className="text-sm text-[var(--muted-foreground)]">{t("Loading…")}</p>
+                            ) : userData ? (
+                              <div className="grid gap-5 md:grid-cols-2">
+                                <div>
+                                  <h3 className="mb-2 text-sm font-semibold">{t("Chat and research sessions")}</h3>
+                                  {userData.sessions.length === 0 ? (
+                                    <p className="text-sm text-[var(--muted-foreground)]">{t("No saved sessions")}</p>
+                                  ) : (
+                                    <div className="max-h-80 space-y-2 overflow-y-auto">
+                                      {userData.sessions.map((session) => (
+                                        <details key={session.id ?? session.session_id} className="rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-2">
+                                          <summary className="cursor-pointer text-sm font-medium">{session.title || t("Untitled session")}</summary>
+                                          <div className="mt-2 space-y-2">
+                                            {session.messages.map((message, index) => (
+                                              <div key={index} className="text-xs text-[var(--muted-foreground)]">
+                                                <span className="font-medium text-[var(--foreground)]">{message.role}: </span>
+                                                <span className="whitespace-pre-wrap break-words">{message.content}</span>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        </details>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                                <div>
+                                  <h3 className="mb-2 text-sm font-semibold">{t("Generated files")}</h3>
+                                  {userData.files.length === 0 ? (
+                                    <p className="text-sm text-[var(--muted-foreground)]">{t("No generated files")}</p>
+                                  ) : (
+                                    <div className="max-h-80 space-y-1 overflow-y-auto text-xs text-[var(--muted-foreground)]">
+                                      {userData.files.map((file) => (
+                                        <div key={file.path} className="flex justify-between gap-3 rounded px-2 py-1 hover:bg-[var(--card)]">
+                                          <span className="min-w-0 truncate">{file.path}</span>
+                                          <span className="shrink-0">{Math.ceil(file.size / 1024)} KB</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            ) : null}
                           </td>
                         </tr>
                       )}

@@ -7,6 +7,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { useAppShell } from "@/context/AppShellContext";
 import {
   BookOpen,
+  CircleHelp,
   BookText,
   Bot,
   Brain,
@@ -27,6 +28,7 @@ import { useTranslation } from "react-i18next";
 import SessionList from "@/components/SessionList";
 import { useSidebarDrawer } from "@/components/layout/AppShell";
 import { useDevice } from "@/hooks/useDevice";
+import { useAuthStatus } from "@/hooks/useAuthStatus";
 import { VersionBadge } from "@/components/sidebar/VersionBadge";
 import type { SessionSummary } from "@/lib/session-api";
 import { Tooltip } from "@/components/ui/Tooltip";
@@ -91,6 +93,12 @@ const PRIMARY_NAV: NavEntry[] = [
 
 const SECONDARY_NAV: NavEntry[] = [
   {
+    href: "/guide",
+    label: "Platform Guide",
+    icon: CircleHelp,
+    tooltipKey: "Learn how to use the platform",
+  },
+  {
     // Memory is its own top-level console (pulled out of the Learning Space):
     // a place to inspect and curate the tutor's long-term memory, not a daily
     // workspace. Never gated — memory has no per-user model requirement.
@@ -147,6 +155,7 @@ export function SidebarShell({
   const router = useRouter();
   const { t } = useTranslation();
   const { has } = useCapabilityAccess();
+  const { enabled: authEnabled, isAdmin } = useAuthStatus();
   const { sidebarCollapsed, setSidebarCollapsed: setCollapsed } = useAppShell();
   const { isMobile } = useDevice();
   const drawer = useSidebarDrawer();
@@ -169,6 +178,9 @@ export function SidebarShell({
   const renderedFooter =
     typeof footerSlot === "function" ? footerSlot(collapsed) : footerSlot;
   const [recentsCollapsed, setRecentsCollapsed] = useState(false);
+  const secondaryNav = SECONDARY_NAV.filter(
+    (item) => item.href !== "/settings" || !authEnabled || isAdmin,
+  );
 
   // Hydrate Recents collapse from localStorage after first render to stay SSR-safe.
   useEffect(() => {
@@ -291,7 +303,7 @@ export function SidebarShell({
         {/* Secondary nav + footer */}
         <div className="flex w-full flex-col items-center gap-1 px-1.5">
           <div className="my-1 h-px w-7 bg-[var(--border)]/40" />
-          {SECONDARY_NAV.map((item) => {
+          {secondaryNav.map((item) => {
             const active = pathname.startsWith(item.href);
             return (
               <Link
@@ -348,14 +360,9 @@ export function SidebarShell({
             height={22}
             className="h-[22px] w-[22px] transition-transform duration-200 group-hover:scale-105"
           />
-          <Image
-            src="/banner.png"
-            alt="DeepTutor"
-            width={897}
-            height={236}
-            priority
-            className="h-[22px] w-auto transition-transform duration-200 group-hover:scale-105"
-          />
+          <span className="font-serif text-[15px] font-semibold tracking-tight text-[var(--foreground)] transition-transform duration-200 group-hover:scale-[1.02]">
+            出海舰deeptutor
+          </span>
         </Link>
         {/* The rail is a desktop affordance; in the drawer the scrim and the
             top-bar toggle already own "make this go away". */}
@@ -472,7 +479,7 @@ export function SidebarShell({
 
       {/* Secondary nav + footer */}
       <div className="border-t border-[var(--border)]/40 px-2 py-2">
-        {SECONDARY_NAV.map((item) => {
+          {secondaryNav.map((item) => {
           const active = pathname.startsWith(item.href);
           return (
             <Link

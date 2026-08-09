@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { parseAuthEnabled } from "./lib/api";
 import {
   CODEX_CALLBACK_API_PATH,
-  COOKIE_NAME,
-  LOGIN_PATH,
-  classifyToken,
-  isAuthExempt,
   isBackendPath,
   isCodexCallbackPath,
 } from "./lib/proxy-policy";
@@ -21,23 +16,6 @@ import {
 // only), so every rewrite would fail to connect.
 const API_BASE_URL =
   process.env.DEEPTUTOR_API_BASE_URL ?? "http://127.0.0.1:8001";
-
-const AUTH_ENABLED = parseAuthEnabled(process.env.DEEPTUTOR_AUTH_ENABLED);
-
-// Redirect to the login page, preserving the intended destination in `next`.
-// A present-but-invalid cookie is cleared so the browser stops resending it;
-// when no cookie was sent there is nothing to clear.
-function redirectToLogin(
-  req: NextRequest,
-  { clearCookie }: { clearCookie: boolean },
-): NextResponse {
-  const loginUrl = req.nextUrl.clone();
-  loginUrl.pathname = LOGIN_PATH;
-  loginUrl.searchParams.set("next", req.nextUrl.pathname);
-  const response = NextResponse.redirect(loginUrl);
-  if (clearCookie) response.cookies.delete(COOKIE_NAME);
-  return response;
-}
 
 export function proxy(req: NextRequest): NextResponse {
   const { pathname, search } = req.nextUrl;
@@ -55,19 +33,8 @@ export function proxy(req: NextRequest): NextResponse {
     return NextResponse.rewrite(new URL(pathname + search, API_BASE_URL));
   }
 
-  // 2. Auth gate — multi-user mode only. Disabled by default, and never blocks
-  //    auth pages, Next.js internals, or public static assets (see
-  //    isAuthExempt: that exemption is what keeps the logo/banner images
-  //    loading once login is enabled — issue #599).
-  if (!AUTH_ENABLED || isAuthExempt(pathname)) {
-    return NextResponse.next();
-  }
-
-  const token = req.cookies.get(COOKIE_NAME)?.value;
-  if (classifyToken(token, Date.now()) !== "valid") {
-    return redirectToLogin(req, { clearCookie: Boolean(token) });
-  }
-
+  // Pages are public. The backend still validates the signed account/guest
+  // cookie on every API call, and admin-only endpoints keep their 403 guard.
   return NextResponse.next();
 }
 

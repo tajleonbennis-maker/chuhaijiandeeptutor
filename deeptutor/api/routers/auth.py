@@ -3,6 +3,7 @@
 from contextvars import Token as _CtxToken
 import logging
 import re
+import uuid
 
 from fastapi import (
     APIRouter,
@@ -39,6 +40,7 @@ from deeptutor.services.auth import (
     add_user,
     authenticate,
     authenticate_pb,
+    change_password,
     create_token,
     decode_token,
     delete_user,
@@ -142,6 +144,7 @@ class AuthStatusResponse(BaseModel):
     username: str | None = None
     role: str | None = None
     is_admin: bool = False
+    is_guest: bool = False
     avatar: str = ""
 
 
@@ -179,6 +182,18 @@ class UpdateProfileRequest(BaseModel):
         if v and not _ICON_MARKER_RE.match(v):
             raise ValueError("Avatar must be empty or 'icon:<name>:<color>'")
         return v
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def new_password_valid(cls, value: str) -> str:
+        if len(value) < 8:
+            raise ValueError("Password must be at least 8 characters")
+        return value
 
 
 # ---------------------------------------------------------------------------
@@ -234,6 +249,19 @@ def _install_current_user(payload: TokenPayload | None) -> _CtxToken:
     return set_current_user(user)
 
 
+def _guest_payload(user_id: str | None = None) -> TokenPayload:
+    """Return an isolated, least-privileged identity for anonymous access."""
+    return TokenPayload(
+        username="Guest",
+        role="user",
+        user_id=user_id or f"guest_{uuid.uuid4().hex}",
+    )
+
+
+def _is_guest(payload: TokenPayload | None) -> bool:
+    return bool(payload and payload.user_id.startswith("guest_"))
+
+
 async def require_auth(
     authorization: str | None = Header(default=None, alias="Authorization"),
     dt_token: str | None = Cookie(default=None, alias=_COOKIE_NAME),
@@ -266,19 +294,13 @@ async def require_auth(
 
     token = _extract_token(authorization, dt_token)
     if not token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Not authenticated",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        payload = _guest_payload("guest_public")
+        _install_current_user(payload)
+        return payload
 
     payload = decode_token(token)
     if not payload:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        payload = _guest_payload("guest_public")
 
     _install_current_user(payload)
     return payload
@@ -318,8 +340,7 @@ async def ws_require_auth(ws: WebSocket) -> _CtxToken | _WsAuthFailed:
     token = ws.query_params.get("token") or ws.cookies.get(_COOKIE_NAME)
     payload = decode_token(token) if token else None
     if not payload:
-        await ws.close(code=4001)
-        return ws_auth_failed
+        payload = _guest_payload("guest_public")
 
     return _install_current_user(payload)
 
@@ -401,6 +422,7 @@ async def receive_codex_oauth_callback(
 
 @router.get("/status", response_model=AuthStatusResponse)
 async def auth_status(
+    response: Response,
     authorization: str | None = Header(default=None, alias="Authorization"),
     dt_token: str | None = Cookie(default=None, alias=_COOKIE_NAME),
 ) -> AuthStatusResponse:
@@ -417,6 +439,14 @@ async def auth_status(
 
     token = _extract_token(authorization, dt_token)
     payload = decode_token(token) if token else None
+    if payload is None:
+        payload = _guest_payload()
+        response.set_cookie(
+            value=create_token(payload.username, payload.role, payload.user_id),
+            max_age=_COOKIE_MAX_AGE,
+            **_cookie_attrs(),
+        )
+    guest = _is_guest(payload)
     avatar = ""
     if payload is not None:
         info = get_user_info(payload.username)
@@ -424,11 +454,12 @@ async def auth_status(
             avatar = str(info.get("avatar") or "")
     return AuthStatusResponse(
         enabled=True,
-        authenticated=payload is not None,
-        user_id=payload.user_id if payload else None,
-        username=payload.username if payload else None,
-        role=payload.role if payload else None,
-        is_admin=payload.role == "admin" if payload else False,
+        authenticated=not guest,
+        user_id=payload.user_id,
+        username=payload.username,
+        role=payload.role,
+        is_admin=payload.role == "admin",
+        is_guest=guest,
         avatar=avatar,
     )
 
@@ -494,11 +525,8 @@ async def logout(response: Response) -> dict:
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 async def register(body: RegisterRequest) -> dict:
     """
-    Bootstrap-only registration.
-
-    Public endpoint that creates the *first* admin account when the user store
-    is empty. Once an admin exists, this endpoint is closed; further accounts
-    must be created by an admin via ``POST /api/v1/auth/users``.
+    Public self-registration. New accounts always receive the ordinary user
+    role; the deployment administrator is provisioned separately.
 
     Only available when AUTH_ENABLED=true.
     """
@@ -509,35 +537,21 @@ async def register(body: RegisterRequest) -> dict:
         )
 
     if POCKETBASE_ENABLED:
-        # PocketBase deployments are documented as single-user. Keep registration
-        # closed and require admins to provision users in the PocketBase admin UI.
-        if not is_first_user():
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Self-registration is closed. Ask an administrator to create your account.",
-            )
         result = register_pb(username=body.username, email=body.username, password=body.password)
         if not result:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Registration failed — username or email may already be taken.",
             )
-        logger.info(f"First user registered via PocketBase: '{body.username}'")
+        logger.info("User self-registered via PocketBase: '%s'", body.username)
         return {
             "ok": True,
             "user_id": result.get("id", ""),
             "username": body.username,
             "role": "user",
-            "is_first_user": True,
+            "is_first_user": False,
             "is_admin": False,
         }
-
-    # Standard mode — only allowed before the first admin exists.
-    if not is_first_user():
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Self-registration is closed. Ask an administrator to create your account.",
-        )
 
     existing = {u["username"] for u in list_users()}
     if body.username in existing:
@@ -554,14 +568,14 @@ async def register(body: RegisterRequest) -> dict:
             user_id = str(item.get("id") or "")
             role = str(item.get("role") or "user")
             break
-    logger.info(f"First user (admin) registered: '{body.username}'")
+    logger.info("User self-registered: '%s'", body.username)
     return {
         "ok": True,
         "user_id": user_id,
         "username": body.username,
         "role": role,
-        "is_first_user": True,
-        "is_admin": role == "admin",
+        "is_first_user": False,
+        "is_admin": False,
     }
 
 
@@ -644,6 +658,26 @@ async def update_profile(
     if current.user_id and _USER_ID_RE.match(current.user_id):
         delete_avatar_file(current.user_id)
     return {"ok": True, "avatar": body.avatar}
+
+
+@router.put("/profile/password")
+async def update_profile_password(
+    body: ChangePasswordRequest,
+    payload: TokenPayload | None = Depends(require_auth),
+) -> dict:
+    """Change the signed-in local user's password after verifying the old one."""
+    current = _require_profile_identity(payload)
+    if POCKETBASE_ENABLED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password changes are managed by PocketBase.",
+        )
+    if not change_password(current.username, body.current_password, body.new_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect.",
+        )
+    return {"ok": True}
 
 
 @router.put("/profile/avatar")

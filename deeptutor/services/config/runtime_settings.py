@@ -50,9 +50,11 @@ CHAT_ATTACHMENT_CHARS_RANGE = (10_000, 5_000_000)
 
 DEFAULT_AUTH_SETTINGS: dict[str, Any] = {
     "version": 1,
-    "enabled": False,
+    "enabled": True,
     "username": "admin",
-    "password_hash": "",
+    # Initial password: admin123. Store only its bcrypt hash; administrators
+    # should replace it from Profile immediately after first login.
+    "password_hash": "$2b$12$mEG3mOKI/5jvi2ePIzSme.E80n.d7gA8aaYbXibsa7OgnFBSeVnba",
     "token_expire_hours": 24,
     "cookie_secure": False,
 }
@@ -915,9 +917,10 @@ class RuntimeSettingsService:
     def _normalize_auth(self, settings: dict[str, Any]) -> dict[str, Any]:
         return {
             "version": 1,
-            "enabled": _coerce_bool(settings.get("enabled"), False),
+            "enabled": _coerce_bool(settings.get("enabled"), DEFAULT_AUTH_SETTINGS["enabled"]),
             "username": _string(settings.get("username")) or "admin",
-            "password_hash": _string(settings.get("password_hash")),
+            "password_hash": _string(settings.get("password_hash"))
+            or str(DEFAULT_AUTH_SETTINGS["password_hash"]),
             "token_expire_hours": max(1, _coerce_int(settings.get("token_expire_hours"), 24)),
             "cookie_secure": _coerce_bool(settings.get("cookie_secure"), False),
         }

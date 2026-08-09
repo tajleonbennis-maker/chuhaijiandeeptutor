@@ -118,13 +118,9 @@ export default function AppShell({ sidebar, children }: AppShellProps) {
                 height={20}
                 className="h-5 w-5"
               />
-              <Image
-                src="/banner.png"
-                alt="DeepTutor"
-                width={897}
-                height={236}
-                className="h-[18px] w-auto"
-              />
+              <span className="font-serif text-sm font-semibold tracking-tight text-[var(--foreground)]">
+                出海舰deeptutor
+              </span>
             </Link>
           </div>
 

@@ -131,6 +131,22 @@ def _load_users() -> dict[str, dict]:
     return load_users(AUTH_USERNAME, AUTH_PASSWORD_HASH)
 
 
+def ensure_bootstrap_admin() -> None:
+    """Persist the configured administrator before public registrations.
+
+    The configured account used to be an in-memory fallback. Once the first
+    self-registered user created the JSON store that fallback disappeared.
+    Persisting it first keeps the configured administrator stable and ensures
+    every public registration is created with the ordinary user role.
+    """
+    if not AUTH_ENABLED or not AUTH_USERNAME or not AUTH_PASSWORD_HASH or POCKETBASE_ENABLED:
+        return
+    from deeptutor.multi_user.identity import load_users, save_user
+
+    if not load_users():
+        save_user(AUTH_USERNAME, AUTH_PASSWORD_HASH, role="admin")
+
+
 def is_first_user() -> bool:
     """Return True when no users exist yet (first registration will become admin)."""
     return len(_load_users()) == 0
@@ -150,6 +166,18 @@ def add_user(username: str, plain_password: str, role: str = "user") -> None:
 
     record = save_user(username, hash_password(plain_password), role=role)  # type: ignore[arg-type]
     logger.info("User '%s' saved with role=%r", username, record.get("role", "user"))
+
+
+def change_password(username: str, current_password: str, new_password: str) -> bool:
+    """Verify the current password and persist a replacement bcrypt hash."""
+    from deeptutor.multi_user.identity import save_user
+
+    record = _load_users().get(username)
+    if not record or not verify_password(current_password, str(record.get("hash") or "")):
+        return False
+    save_user(username, hash_password(new_password), role=str(record.get("role") or "user"))
+    logger.info("User '%s' changed their password", username)
+    return True
 
 
 def list_users() -> list[dict]:

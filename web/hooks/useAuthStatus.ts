@@ -10,6 +10,7 @@ export interface AuthStatusState {
   authenticated: boolean;
   /** Whether the authenticated user is an admin. */
   isAdmin: boolean;
+  isGuest: boolean;
   /** True until the first status fetch resolves. */
   loading: boolean;
 }
@@ -18,6 +19,7 @@ const INITIAL: AuthStatusState = {
   enabled: false,
   authenticated: false,
   isAdmin: false,
+  isGuest: false,
   loading: true,
 };
 
@@ -44,6 +46,7 @@ function loadAuthStatus(): Promise<AuthStatusState> {
         enabled: Boolean(status?.enabled),
         authenticated: Boolean(status?.authenticated),
         isAdmin: status?.role === "admin",
+        isGuest: Boolean(status?.is_guest),
         loading: false,
       }))
       .finally(() => {
