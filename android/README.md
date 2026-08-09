@@ -8,7 +8,7 @@ Android 客户端是一个受限的原生 WebView 容器，固定连接出海舰
 - WebView 只在应用内加载编译时指定的服务器主机；外部链接交给系统浏览器。
 - Cookie 由 Android WebView 的 Cookie 存储管理，JavaScript 无法读取服务器设置的 `HttpOnly` 登录 Cookie。
 - SSL 证书错误一律拒绝，不允许用户点击绕过。
-- 当前生产服务器仍使用 HTTP，Android 的明文网络例外仅允许该固定 IP。服务器启用 HTTPS 后应同步更换 `SERVER_URL` 并删除该例外。
+- 正式服务器使用 `https://www.cyberstroll.cn/`，应用禁止明文网络连接。
 
 ## 构建
 

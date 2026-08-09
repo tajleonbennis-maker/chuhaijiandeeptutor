@@ -3,7 +3,7 @@ import UIKit
 import WebKit
 
 final class WebViewController: UIViewController {
-    private static let serverURL = URL(string: "http://102.134.48.49/")!
+    private static let serverURL = URL(string: "https://www.cyberstroll.cn/")!
     private static let bootstrapKey = "deeptutor-ios-bootstrap-v1"
 
     private lazy var webView: WKWebView = {

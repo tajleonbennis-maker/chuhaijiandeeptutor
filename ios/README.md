@@ -17,7 +17,7 @@ xcodebuild -project DeepTutor.xcodeproj \
 
 ## 安全边界
 
-- 应用内仅加载编译时固定的 `http://102.134.48.49/`。
+- 应用内仅加载编译时固定的 `https://www.cyberstroll.cn/`。
 - 其他 HTTP、HTTPS、电话和邮件链接交给系统应用。
-- HTTP 临时例外仅允许当前服务器 IP；服务器启用 HTTPS 后应删除该例外。
+- App Transport Security 保持开启，不允许明文 HTTP 连接。
 - 登录 Cookie 由 `WKWebsiteDataStore` 管理。

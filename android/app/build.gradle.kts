@@ -15,7 +15,7 @@ android {
 
         // The Android client intentionally has no server selector. Releasing a
         // build for another deployment requires a new, reviewed APK.
-        buildConfigField("String", "SERVER_URL", "\"http://102.134.48.49:3782/\"")
+        buildConfigField("String", "SERVER_URL", "\"https://www.cyberstroll.cn/\"")
     }
 
     buildFeatures {
