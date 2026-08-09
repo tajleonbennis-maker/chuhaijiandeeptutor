@@ -31,6 +31,30 @@ final class WebViewController: UIViewController {
     private static var bootstrapScript: String {
         """
         (function(){try{
+          // Mobile WebKit can load the frontend through port 80 while failing
+          // to preserve the Upgrade headers through the frontend proxy. Route
+          // DeepTutor API sockets straight to the exposed Uvicorn endpoint.
+          var NativeWebSocket=window.WebSocket;
+          function DeepTutorWebSocket(url,protocols){
+            var target=String(url);
+            try{
+              var parsed=new URL(target,window.location.href);
+              if(parsed.hostname==='102.134.48.49' && parsed.pathname.indexOf('/api/')===0){
+                parsed.protocol=window.location.protocol==='https:'?'wss:':'ws:';
+                parsed.port='8001';
+                target=parsed.toString();
+              }
+            }catch(e){}
+            return protocols===undefined
+              ? new NativeWebSocket(target)
+              : new NativeWebSocket(target,protocols);
+          }
+          DeepTutorWebSocket.prototype=NativeWebSocket.prototype;
+          ['CONNECTING','OPEN','CLOSING','CLOSED'].forEach(function(k){
+            Object.defineProperty(DeepTutorWebSocket,k,{value:NativeWebSocket[k]});
+          });
+          window.WebSocket=DeepTutorWebSocket;
+
           var k='\(bootstrapKey)';
           if(localStorage.getItem(k)==='1')return;
           localStorage.setItem('deeptutor-language','zh');
