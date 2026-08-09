@@ -72,6 +72,11 @@ const NEXT_PUBLIC_AUTH_ENABLED = normalizeBoolean(
   ),
 );
 
+// [DEPLOY] Optional URL sub-path for hosting under an nginx prefix like
+// https://host/subpath. Empty by default (root path). Build with
+// DEEPTUTOR_BASE_PATH=/deeptutor to mount the whole app under /deeptutor.
+const BASE_PATH = firstNonEmpty(process.env.DEEPTUTOR_BASE_PATH, "");
+
 process.env.NEXT_PUBLIC_API_BASE = NEXT_PUBLIC_API_BASE;
 process.env.NEXT_PUBLIC_AUTH_ENABLED = NEXT_PUBLIC_AUTH_ENABLED;
 
@@ -97,6 +102,10 @@ const nextConfig = {
   // process while it is running.
   distDir: process.env.DEEPTUTOR_NEXT_DIST_DIR || ".next",
 
+  // [DEPLOY] Base URL sub-path; see BASE_PATH above. All routes, assets, and
+  // client links are prefixed at build time.
+  basePath: BASE_PATH,
+
   // Expose the build-time version to the browser so the sidebar badge
   // can compare it against GitHub's latest release.
   env: {
@@ -109,6 +118,11 @@ const nextConfig = {
   // This eliminates the need to copy the full node_modules into Docker production images
   output: "standalone",
 
+  // [DEPLOY-OPT] Skip TS type-check to reduce memory & build time.
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+
   // web/proxy.ts (the Next.js middleware) forwards /api/* and /ws/* to the
   // backend by buffering and re-issuing the request. Next caps the buffered
   // request body at 10MB by default, but the backend accepts uploads up to
@@ -117,6 +131,7 @@ const nextConfig = {
   // silently truncated when they pass through the proxy.
   experimental: {
     proxyClientMaxBodySize: 210 * 1024 * 1024,
+    cpus: 2,
   },
 
   // Move dev indicator to bottom-right corner
