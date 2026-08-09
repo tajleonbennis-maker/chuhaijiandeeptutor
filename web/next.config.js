@@ -96,6 +96,21 @@ const APP_VERSION = (() => {
 })();
 
 const nextConfig = {
+  async redirects() {
+    return [
+      {
+        source: "/android",
+        destination: "/android-download.html",
+        permanent: false,
+      },
+      {
+        source: "/downloads/latest.apk",
+        destination: "/downloads/DeepTutor-Android-v1.0.0.apk",
+        permanent: false,
+      },
+    ];
+  },
+
   // Keep the production build used by `deeptutor start` separate from the
   // `.next` development cache used by the explicit `deeptutor start --dev`.
   // Without separate directories either command can invalidate the other
