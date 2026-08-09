@@ -17,7 +17,13 @@
   <key>NSCameraUsageDescription</key><string>用于拍摄并上传学习资料。</string>
   <key>NSPhotoLibraryUsageDescription</key><string>用于选择并上传学习资料。</string>
   <key>NSAppTransportSecurity</key>
-  <dict><key>NSAllowsArbitraryLoads</key><false/><key>NSExceptionDomains</key><dict><key>102.134.48.49</key><dict><key>NSExceptionAllowsInsecureHTTPLoads</key><true/><key>NSIncludesSubdomains</key><false/></dict></dict></dict>
+  <dict>
+    <key>NSAllowsArbitraryLoads</key><false/>
+    <!-- ATS domain exceptions do not support numeric IP addresses. Limit the
+         exception to web content; WebViewController still allows navigation
+         only to the single compiled-in server origin. -->
+    <key>NSAllowsArbitraryLoadsInWebContent</key><true/>
+  </dict>
   <key>UILaunchScreen</key><dict><key>UIColorName</key><string></string></dict>
   <key>UISupportedInterfaceOrientations</key><array><string>UIInterfaceOrientationPortrait</string><string>UIInterfaceOrientationLandscapeLeft</string><string>UIInterfaceOrientationLandscapeRight</string></array>
 </dict>

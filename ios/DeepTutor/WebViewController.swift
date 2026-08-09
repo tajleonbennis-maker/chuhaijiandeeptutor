@@ -3,12 +3,13 @@ import UIKit
 import WebKit
 
 final class WebViewController: UIViewController {
-    private static let serverURL = URL(string: "http://102.134.48.49:3782/")!
+    private static let serverURL = URL(string: "http://102.134.48.49/")!
     private static let bootstrapKey = "deeptutor-ios-bootstrap-v1"
 
     private lazy var webView: WKWebView = {
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .default()
+        configuration.applicationNameForUserAgent = "DeepTutoriOS/1.0"
         configuration.defaultWebpagePreferences.allowsContentJavaScript = true
         configuration.allowsInlineMediaPlayback = true
         configuration.mediaTypesRequiringUserActionForPlayback = [.video]
@@ -19,7 +20,6 @@ final class WebViewController: UIViewController {
         view.navigationDelegate = self
         view.uiDelegate = self
         view.allowsBackForwardNavigationGestures = true
-        view.customUserAgent = "DeepTutoriOS/1.0"
         view.translatesAutoresizingMaskIntoConstraints = false
         return view
     }()
