@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+    <!-- The current production deployment is HTTP-only. Cleartext access is
+         deliberately limited to this fixed server instead of all hosts. -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">102.134.48.49</domain>
+    </domain-config>
+</network-security-config>

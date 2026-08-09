@@ -8,6 +8,7 @@ import { useAppShell } from "@/context/AppShellContext";
 import {
   BookOpen,
   CircleHelp,
+  Download,
   BookText,
   Bot,
   Brain,
@@ -92,6 +93,12 @@ const PRIMARY_NAV: NavEntry[] = [
 ];
 
 const SECONDARY_NAV: NavEntry[] = [
+  {
+    href: "/android-download.html",
+    label: "Android 下载",
+    icon: Download,
+    tooltipKey: "Download the Android app",
+  },
   {
     href: "/guide",
     label: "Platform Guide",

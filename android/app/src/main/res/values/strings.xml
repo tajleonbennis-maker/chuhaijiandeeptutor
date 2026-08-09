@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">出海舰deeptutor</string>
+    <string name="connection_failed">暂时无法连接服务器</string>
+    <string name="connection_hint">请检查网络后重试。您的学习数据保存在服务器上，不会因重试丢失。</string>
+    <string name="retry">重新连接</string>
+    <string name="download_started">已开始下载</string>
+    <string name="download_failed">无法下载该文件</string>
+    <string name="no_file_picker">未找到可用的文件选择器</string>
+    <string name="microphone_denied">需要麦克风权限才能使用语音功能</string>
+    <string name="external_link_failed">无法打开外部链接</string>
+</resources>

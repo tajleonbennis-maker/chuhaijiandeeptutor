@@ -26,15 +26,19 @@ export function apiUrl(path: string): string {
 /**
  * Construct a WebSocket URL from a path.
  *
- * Pass-through: returns the path unchanged. `proxy.ts` rewrites `/ws/*` to
- * the configured backend, and the runtime upgrades to `ws://` /
- * `wss://` based on the backend's scheme.
+ * Builds an absolute same-origin WebSocket URL. Desktop browsers accept a
+ * relative URL in practice, but some Android WebView versions reject it
+ * before the request reaches the server. `proxy.ts` still rewrites the
+ * resulting same-origin `/api/*` request to the configured backend.
  *
  * @param path - WebSocket path (e.g., '/api/v1/solve')
  * @returns The same path, unchanged
  */
 export function wsUrl(path: string): string {
-  return path;
+  if (typeof window === "undefined") return path;
+  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  return `${protocol}//${window.location.host}${normalizedPath}`;
 }
 
 /**

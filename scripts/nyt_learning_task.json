@@ -1,0 +1,20 @@
+{
+  "title": "今日纽约时报英语",
+  "description": "通过纽约时报今日新闻学习词汇、阅读、表达与批判性思考。",
+  "subject": "英语",
+  "grade": "初二—初三",
+  "difficulty": "适中",
+  "duration_minutes": 20,
+  "objectives": ["理解新闻标题", "掌握新闻英语词汇", "用英语表达观点"],
+  "knowledge_bases": ["nyt-english-daily"],
+  "audience": { "type": "all", "user_ids": [] },
+  "publish": true,
+  "steps": [
+    { "id": "step_1", "kind": "warmup", "title": "标题预测", "description": "阅读标题，在查看摘要前预测新闻内容。", "content": "今日标题\nThe Lonely Crew at the Kennedy Center Will Miss Its… Mice\n\n先不要查词典，也不要看后面的正文。想一想：\n1. crew 在这里可能指哪些人？\n2. 为什么工作人员会感到 lonely？\n3. 老鼠可能发生了什么？\n\n用这个句型写出预测：\nI think the article is about ______ because ______.", "prompt": "你是初中英语教师。学生正在进行标题预测。每次只问一个问题，不要提前透露新闻摘要；学生回答后，先肯定合理推测，再提示一个可改进的英语表达。" },
+    { "id": "step_2", "kind": "vocabulary", "title": "重点词汇", "description": "学习新闻中最有用的词汇和固定搭配。", "content": "1. lonely /ˈloʊnli/ adj. 孤独的；冷清的\n例：The building felt lonely after everyone left.\n\n2. crew /kruː/ n. 一组工作人员\n例：The cleaning crew arrived early.\n\n3. performing arts center 表演艺术中心\n例：The concert was held at a performing arts center.\n\n4. quirky /ˈkwɜːrki/ adj. 古怪但有趣的\n例：The museum has a quirky design.\n\n5. renovation /ˌrenəˈveɪʃn/ n. 翻修\n例：The theater is closed for renovation.\n\n小练习：用 crew、quirky、renovation 各造一个短句。", "prompt": "扮演耐心的词汇教师，检查学生使用 crew、quirky、renovation 写的句子。逐句纠错，并用初中生能理解的中文解释。" },
+    { "id": "step_3", "kind": "read", "title": "分级阅读", "description": "阅读适合初中水平的简化材料。", "content": "Mice at the Kennedy Center\n\nThe Kennedy Center is a famous performing arts center in Washington, D.C. A group of employees there has noticed some unusual mice in the building. The mice look different, and people say they may have an interesting history.\n\nThe building is going through changes and renovation. Because of this, some workers may leave the center or work in different places. The employees joke that they will miss the mice. The story asks whether the popular tale about these special-looking mice is really true.\n\n阅读提示：第一段介绍地点、人物和特别之处；第二段介绍变化以及新闻想调查的问题。\n\n材料依据纽约时报官方 RSS 的标题与简讯改写，适合初中英语学习，并非新闻全文。", "prompt": "带领学生分段阅读这篇分级短文。先让学生朗读第一段，再问一个事实问题；不要一次讲完全部内容。" },
+    { "id": "step_4", "kind": "quiz", "title": "阅读理解", "description": "完成理解题，再核对参考答案。", "content": "先独立作答：\n\n1. Where is the Kennedy Center?\nA. New York  B. Washington, D.C.  C. London\n\n2. What is special about the mice?\nA. They look unusual.  B. They can sing.  C. They are pets.\n\n3. Why might the crew miss the mice?\nA. The building and their work situation are changing.\nB. The mice are moving to a zoo.\nC. The center has no performances.\n\n4. In the headline, “its” refers to __________.\n\n5. 用一句英文概括文章。\n\n参考答案（完成后再看）：1-B；2-A；3-A；4-the crew；第5题示例：Workers at the Kennedy Center may miss its unusual mice during changes to the building.", "prompt": "作为英语教师，逐题批改学生的五道阅读题。先请学生提交答案，再解释错题；对开放题同时给出语法和内容建议。" },
+    { "id": "step_5", "kind": "discussion", "title": "英语对话", "description": "用英语表达观点，由 AI 追问和纠错。", "content": "选择一个问题，用 2—3 句英语回答：\n\n• Can animals make a workplace feel friendlier? Why?\n• Should old buildings protect small animals during renovation?\n• Do you think the story about the mice is true?\n\n表达支架：\nI think ______ because ______.\nFor example, ______.\nHowever, ______.", "prompt": "围绕肯尼迪中心老鼠新闻与初中生进行英语对话。每次只问一个问题；学生回答后，先回应观点，再温和纠正一处最重要的语言问题。" },
+    { "id": "step_6", "kind": "summary", "title": "学习总结", "description": "复述新闻并整理今日生词。", "content": "完成今日出口卡：\n\n1. 用 3—5 句英文复述新闻。\n2. 写出今天掌握的 3 个词。\n3. 写出一个仍然不懂的问题。\n4. 给自己的学习状态打分：😊 理解很好 / 😐 基本理解 / 😕 需要帮助\n\n推荐句型：\nToday I read a story about ______.\nI learned that ______.\nThe most useful word was ______.\nI still want to know ______.", "prompt": "帮助学生完成出口卡。不要代写；通过逐句提问让学生自己完成，最后给出简短反馈和下一次复习建议。" }
+  ]
+}

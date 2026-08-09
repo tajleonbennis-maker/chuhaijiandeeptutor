@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useTranslation } from "react-i18next";
 import {
   ArrowUpRight,
+  BookOpenCheck,
   ClipboardList,
   GraduationCap,
   History,
@@ -23,6 +24,7 @@ import { listNotebooks, listNotebookEntries } from "@/lib/notebook-api";
 import { listPersonas } from "@/lib/personas-api";
 import { listSkills } from "@/lib/skills-api";
 import { fetchAllProgress } from "@/lib/learning-api";
+import { listLearningTasks } from "@/lib/learning-tasks-api";
 
 /**
  * Learning Space dashboard — the hub of `/space`.
@@ -36,6 +38,7 @@ import { fetchAllProgress } from "@/lib/learning-api";
 type Lang = { zh: string; en: string };
 
 type DashKey =
+  | "learning_tasks"
   | "chat_history"
   | "notebooks"
   | "question_bank"
@@ -64,6 +67,39 @@ interface DashboardGroup {
 }
 
 const GROUPS: DashboardGroup[] = [
+  {
+    label: { zh: "课程与任务", en: "Lessons & Assignments" },
+    items: [
+      {
+        key: "learning_tasks",
+        href: "/space/tasks",
+        icon: BookOpenCheck,
+        title: { zh: "教学任务", en: "Learning Tasks" },
+        blurb: {
+          zh: "接收教师教案，按步骤完成阅读、练习、讨论和总结。",
+          en: "Follow assigned lessons through reading, practice, discussion, and reflection.",
+        },
+        unit: { zh: "项任务", en: "tasks" },
+        tile: "bg-teal-500/10 text-teal-600 dark:text-teal-400",
+        load: async () => (await listLearningTasks()).tasks.length,
+      },
+      {
+        key: "mastery_path",
+        href: "/space/learning",
+        icon: GraduationCap,
+        title: { zh: "精通之路", en: "Mastery Path" },
+        blurb: {
+          zh: "掌握式学习：硬门槛与间隔复习。",
+          en: "Mastery-based learning: hard gate and spaced review.",
+        },
+        unit: { zh: "条路径", en: "paths" },
+        tile: "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400",
+        load: async () =>
+          (await fetchAllProgress()).summaries.filter((s) => s.kp_count > 0)
+            .length,
+      },
+    ],
+  },
   {
     label: { zh: "对话与资料", en: "Conversations & Materials" },
     items: [
@@ -111,21 +147,6 @@ const GROUPS: DashboardGroup[] = [
   {
     label: { zh: "个性化", en: "Personalization" },
     items: [
-      {
-        key: "mastery_path",
-        href: "/space/learning",
-        icon: GraduationCap,
-        title: { zh: "精通之路", en: "Mastery Path" },
-        blurb: {
-          zh: "掌握式学习：硬门槛与间隔复习。",
-          en: "Mastery-based learning: hard gate and spaced review.",
-        },
-        unit: { zh: "条路径", en: "paths" },
-        tile: "bg-teal-500/10 text-teal-600 dark:text-teal-400",
-        load: async () =>
-          (await fetchAllProgress()).summaries.filter((s) => s.kp_count > 0)
-            .length,
-      },
       {
         key: "personas",
         href: "/space/personas",

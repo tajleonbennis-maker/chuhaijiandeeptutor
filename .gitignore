@@ -151,6 +151,19 @@ cache/
 *.iws
 *.ipr
 
+# Android local/build artifacts and signing material
+android/.gradle/
+android/local.properties
+android/**/build/
+android/captures/
+android/.cxx/
+android/*.jks
+android/*.keystore
+
+# Xcode per-user state
+ios/**/xcuserdata/
+*.xcuserstate
+
 # Sublime Text
 *.sublime-project
 *.sublime-workspace

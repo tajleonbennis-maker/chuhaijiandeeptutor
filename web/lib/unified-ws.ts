@@ -168,6 +168,7 @@ export class UnifiedWSClient {
 
   private activeTurnId: string | null = null;
   private lastSeq = 0;
+  private pendingMessages: ChatMessage[] = [];
 
   constructor(onEvent: EventHandler, onClose?: () => void) {
     this.onEvent = onEvent;
@@ -191,6 +192,15 @@ export class UnifiedWSClient {
       this.reconnectAttempt = 0;
       this.lastReceivedAt = Date.now();
       this.startHeartbeat();
+
+      // A user can submit immediately after the page mounts, while the
+      // WebSocket is still CONNECTING. Keep those messages instead of
+      // silently dropping them, then flush in their original order once the
+      // connection is ready.
+      const pending = this.pendingMessages.splice(0);
+      for (const message of pending) {
+        this.ws?.send(JSON.stringify(message));
+      }
 
       if (this.activeTurnId) {
         this.send({
@@ -235,7 +245,8 @@ export class UnifiedWSClient {
 
   send(msg: ChatMessage): void {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      console.error("WebSocket not connected");
+      this.pendingMessages.push(msg);
+      this.connect();
       return;
     }
     this.ws.send(JSON.stringify(msg));
@@ -247,6 +258,7 @@ export class UnifiedWSClient {
     this.clearReconnectTimer();
     this.ws?.close();
     this.ws = null;
+    this.pendingMessages = [];
     this.resetResumeState();
   }
 

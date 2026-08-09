@@ -344,6 +344,7 @@ from deeptutor.api.routers import (
     dashboard,
     imports,
     knowledge,
+    learning_tasks,
     mastery_path,
     mcp_settings,
     memory,
@@ -407,6 +408,12 @@ app.include_router(
     mastery_path.router,
     prefix="/api/v1/learning",
     tags=["mastery-path"],
+    dependencies=_auth,
+)
+app.include_router(
+    learning_tasks.router,
+    prefix="/api/v1/learning-tasks",
+    tags=["learning-tasks"],
     dependencies=_auth,
 )
 app.include_router(
