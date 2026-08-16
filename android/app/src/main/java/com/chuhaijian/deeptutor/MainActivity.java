@@ -2,6 +2,7 @@ package com.chuhaijian.deeptutor;
 
 import android.Manifest;
 import android.app.DownloadManager;
+import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
@@ -29,6 +30,7 @@ import android.webkit.WebResourceRequest;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
@@ -50,9 +52,13 @@ public final class MainActivity extends ComponentActivity {
     private static final int AUDIO_PERMISSION_REQUEST = 4102;
     private static final int STORAGE_PERMISSION_REQUEST = 4103;
     private static final String ANDROID_BOOTSTRAP_KEY =
-            "deeptutor-android-bootstrap-v3";
+            "deeptutor-android-bootstrap-v4";
+    private static final String PREFERENCES_NAME = "deeptutor_android";
+    private static final String SERVER_URL_KEY = "server_url";
+    private static final String WEB_CACHE_VERSION_KEY = "web_cache_version";
+    private static final int WEB_CACHE_VERSION = 4;
 
-    private final Uri serverUri = Uri.parse(BuildConfig.SERVER_URL);
+    private Uri serverUri;
     private WebView webView;
     private ProgressBar progressBar;
     private View errorView;
@@ -63,6 +69,7 @@ public final class MainActivity extends ComponentActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        serverUri = Uri.parse(getServerUrl());
         configureSystemBars();
         View contentView = createContentView();
         setContentView(contentView);
@@ -135,11 +142,38 @@ public final class MainActivity extends ComponentActivity {
     }
 
     private View createContentView() {
-        FrameLayout root = new FrameLayout(this);
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(Color.WHITE);
 
+        LinearLayout toolbar = new LinearLayout(this);
+        toolbar.setGravity(Gravity.CENTER_VERTICAL);
+        toolbar.setPadding(dp(16), 0, dp(8), 0);
+
+        TextView brand = new TextView(this);
+        brand.setText(R.string.app_name);
+        brand.setTextColor(Color.rgb(15, 23, 42));
+        brand.setTextSize(17);
+        toolbar.addView(brand, new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.MATCH_PARENT, 1
+        ));
+
+        Button serverSettings = new Button(this);
+        serverSettings.setText(R.string.server_settings);
+        serverSettings.setAllCaps(false);
+        serverSettings.setOnClickListener(view -> showServerSettings());
+        toolbar.addView(serverSettings, new LinearLayout.LayoutParams(dp(96), dp(44)));
+        root.addView(toolbar, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(52)
+        ));
+
+        FrameLayout browser = new FrameLayout(this);
+        root.addView(browser, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1
+        ));
+
         webView = new WebView(this);
-        root.addView(webView, new FrameLayout.LayoutParams(
+        browser.addView(webView, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT
         ));
@@ -151,11 +185,11 @@ public final class MainActivity extends ComponentActivity {
                 dp(3)
         );
         progressParams.gravity = Gravity.TOP;
-        root.addView(progressBar, progressParams);
+        browser.addView(progressBar, progressParams);
 
         errorView = createErrorView();
         errorView.setVisibility(View.GONE);
-        root.addView(errorView, new FrameLayout.LayoutParams(
+        browser.addView(errorView, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT
         ));
@@ -217,8 +251,19 @@ public final class MainActivity extends ComponentActivity {
         webView.getSettings().setBuiltInZoomControls(false);
         webView.getSettings().setDisplayZoomControls(false);
         webView.getSettings().setUserAgentString(
-                webView.getSettings().getUserAgentString() + " DeepTutorAndroid/1.0"
+                webView.getSettings().getUserAgentString() + " DeepTutorAndroid/1.0.1"
         );
+
+        int cachedVersion = getSharedPreferences(PREFERENCES_NAME, MODE_PRIVATE)
+                .getInt(WEB_CACHE_VERSION_KEY, 0);
+        if (cachedVersion != WEB_CACHE_VERSION) {
+            // Sub-path deployments bake API and WebSocket prefixes into the
+            // JavaScript bundle. Drop stale bundles after an APK update while
+            // preserving login cookies and the selected server.
+            webView.clearCache(true);
+            getSharedPreferences(PREFERENCES_NAME, MODE_PRIVATE)
+                    .edit().putInt(WEB_CACHE_VERSION_KEY, WEB_CACHE_VERSION).apply();
+        }
 
         webView.setWebViewClient(new PlatformWebViewClient());
         webView.setWebChromeClient(new PlatformChromeClient());
@@ -232,7 +277,78 @@ public final class MainActivity extends ComponentActivity {
             showConnectionError();
             return;
         }
-        webView.loadUrl(BuildConfig.SERVER_URL);
+        webView.loadUrl(serverUri.toString());
+    }
+
+    private String getServerUrl() {
+        String configured = getSharedPreferences(PREFERENCES_NAME, MODE_PRIVATE)
+                .getString(SERVER_URL_KEY, "");
+        return configured == null || configured.isBlank()
+                ? BuildConfig.DEFAULT_SERVER_URL
+                : configured;
+    }
+
+    private void showServerSettings() {
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(24), dp(8), dp(24), 0);
+
+        EditText input = new EditText(this);
+        input.setSingleLine(true);
+        input.setHint(R.string.server_address_hint);
+        String saved = getSharedPreferences(PREFERENCES_NAME, MODE_PRIVATE)
+                .getString(SERVER_URL_KEY, "");
+        input.setText(saved == null ? "" : saved);
+        content.addView(input, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        ));
+
+        TextView help = new TextView(this);
+        help.setText(R.string.server_address_help);
+        help.setTextColor(Color.rgb(71, 85, 105));
+        help.setTextSize(13);
+        content.addView(help);
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(R.string.server_settings_title)
+                .setView(content)
+                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.use_server, null)
+                .create();
+        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+                .setOnClickListener(view -> saveServerUrl(input, dialog)));
+        dialog.show();
+    }
+
+    private void saveServerUrl(EditText input, AlertDialog dialog) {
+        String value = input.getText().toString().trim();
+        if (value.isEmpty()) {
+            getSharedPreferences(PREFERENCES_NAME, MODE_PRIVATE)
+                    .edit().remove(SERVER_URL_KEY).apply();
+            serverUri = Uri.parse(BuildConfig.DEFAULT_SERVER_URL);
+        } else {
+            if (!value.contains("://")) value = "https://" + value;
+            Uri candidate = Uri.parse(value);
+            if (!"https".equalsIgnoreCase(candidate.getScheme())
+                    || candidate.getHost() == null) {
+                input.setError(getString(R.string.invalid_server_address));
+                return;
+            }
+            // Keep sub-path deployments canonical. Some Android System WebView
+            // versions surface a trailing-slash 308 as a main-frame failure.
+            while (candidate.getPath() != null
+                    && candidate.getPath().length() > 1
+                    && value.endsWith("/")) {
+                value = value.substring(0, value.length() - 1);
+                candidate = Uri.parse(value);
+            }
+            getSharedPreferences(PREFERENCES_NAME, MODE_PRIVATE)
+                    .edit().putString(SERVER_URL_KEY, value).apply();
+            serverUri = Uri.parse(value);
+        }
+        dialog.dismiss();
+        webView.clearHistory();
+        loadPlatform();
     }
 
     private boolean hasNetwork() {

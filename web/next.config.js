@@ -127,6 +127,7 @@ const nextConfig = {
     NEXT_PUBLIC_APP_VERSION: APP_VERSION,
     NEXT_PUBLIC_API_BASE,
     NEXT_PUBLIC_AUTH_ENABLED,
+    NEXT_PUBLIC_BASE_PATH: BASE_PATH,
   },
 
   // Standalone output: self-contained server.js + minimal node_modules

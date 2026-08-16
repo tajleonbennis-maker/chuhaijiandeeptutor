@@ -20,7 +20,12 @@
  * @returns The same path, unchanged
  */
 export function apiUrl(path: string): string {
-  return path;
+  const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  if (!basePath || normalizedPath.startsWith(`${basePath}/`)) {
+    return normalizedPath;
+  }
+  return `${basePath}${normalizedPath}`;
 }
 
 /**
@@ -37,7 +42,7 @@ export function apiUrl(path: string): string {
 export function wsUrl(path: string): string {
   if (typeof window === "undefined") return path;
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  const normalizedPath = apiUrl(path);
   return `${protocol}//${window.location.host}${normalizedPath}`;
 }
 
@@ -92,7 +97,7 @@ export async function apiFetch(
     typeof window !== "undefined"
   ) {
     const next = encodeURIComponent(window.location.pathname);
-    window.location.href = `/login?next=${next}`;
+    window.location.href = apiUrl(`/login?next=${next}`);
     return new Promise(() => {});
   }
 

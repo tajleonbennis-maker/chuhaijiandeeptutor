@@ -48,7 +48,7 @@ export default function SessionLoadingView({
       {/* Logo + spinner */}
       <div className="flex items-center gap-3">
         <img
-          src="/logo_black.png"
+          src={`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/logo_black.png`}
           alt="DeepTutor"
           width={32}
           height={32}

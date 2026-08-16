@@ -1982,7 +1982,7 @@ export default function ChatPage() {
               <div className="flex w-full flex-1 min-h-0 items-end justify-center pb-14 animate-fade-in px-6">
                 <div className="w-full max-w-[960px] flex items-center justify-center gap-4">
                   <img
-                    src="/logo_black.png"
+                    src={`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/logo_black.png`}
                     alt="DeepTutor"
                     width={40}
                     height={40}

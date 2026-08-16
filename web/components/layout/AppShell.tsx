@@ -14,6 +14,7 @@ import { Menu } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useDevice } from "@/hooks/useDevice";
 import type { ReactNode } from "react";
+import { HeaderAuthActions } from "@/components/auth/HeaderAuthActions";
 
 /* Lets the sidebar dismiss the drawer after a nav click without every layout
    threading a callback down through WorkspaceSidebar/UtilitySidebar. Null on
@@ -100,19 +101,19 @@ export default function AppShell({ sidebar, children }: AppShellProps) {
         </div>
 
         <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-[var(--background)]">
-          <div className="flex h-11 shrink-0 items-center gap-1 border-b border-[var(--border)] px-2 md:hidden">
+          <div className="flex h-11 shrink-0 items-center gap-1 border-b border-[var(--border)] px-2">
             <button
               type="button"
               onClick={() => setDrawerOpen(true)}
               aria-label={t("Open navigation")}
               aria-expanded={drawerOpen}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-[var(--muted-foreground)] transition-colors hover:bg-[var(--muted)]/55 hover:text-[var(--foreground)]"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-[var(--muted-foreground)] transition-colors hover:bg-[var(--muted)]/55 hover:text-[var(--foreground)] md:hidden"
             >
               <Menu size={18} strokeWidth={1.7} />
             </button>
-            <Link href="/" className="flex items-center gap-1.5">
+            <Link href="/" className="flex items-center gap-1.5 md:hidden">
               <Image
-                src="/logo.png"
+                src={`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/logo.png`}
                 alt="DeepTutor"
                 width={20}
                 height={20}
@@ -122,6 +123,7 @@ export default function AppShell({ sidebar, children }: AppShellProps) {
                 出海舰deeptutor
               </span>
             </Link>
+            <HeaderAuthActions />
           </div>
 
           <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
