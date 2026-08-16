@@ -1,6 +1,6 @@
-# 出海舰deeptutor Android
+# chuhaijiandeeptutor Android
 
-Android 客户端是一个受限的原生 WebView 容器。默认连接出海舰deeptutor 官方服务器，用户也可在应用顶部的“服务器”入口指定自己的服务端。它与网页版共用界面、账号、登录 Cookie、WebSocket 聊天、研究任务和服务器数据。
+Android 客户端是一个受限的原生 WebView 容器。默认连接 chuhaijiandeeptutor 官方服务器，用户也可在应用顶部的“服务器”入口指定自己的服务端。它与网页版共用界面、账号、登录 Cookie、WebSocket 聊天、研究任务和服务器数据。
 
 ## 安全边界
 

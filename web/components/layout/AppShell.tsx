@@ -120,7 +120,7 @@ export default function AppShell({ sidebar, children }: AppShellProps) {
                 className="h-5 w-5"
               />
               <span className="font-serif text-sm font-semibold tracking-tight text-[var(--foreground)]">
-                出海舰deeptutor
+                chuhaijiandeeptutor
               </span>
             </Link>
             <HeaderAuthActions />

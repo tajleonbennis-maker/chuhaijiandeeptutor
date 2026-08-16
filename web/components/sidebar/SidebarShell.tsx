@@ -368,7 +368,7 @@ export function SidebarShell({
             className="h-[22px] w-[22px] transition-transform duration-200 group-hover:scale-105"
           />
           <span className="font-serif text-[15px] font-semibold tracking-tight text-[var(--foreground)] transition-transform duration-200 group-hover:scale-[1.02]">
-            出海舰deeptutor
+            chuhaijiandeeptutor
           </span>
         </Link>
         {/* The rail is a desktop affordance; in the drawer the scrim and the

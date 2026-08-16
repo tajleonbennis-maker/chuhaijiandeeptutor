@@ -58,7 +58,7 @@ export default function GuidePage() {
             {zh ? "平台使用指南" : "Platform guide"}
           </p>
           <h1 className="mt-3 max-w-3xl font-serif text-3xl font-semibold tracking-tight text-[var(--foreground)] sm:text-4xl">
-            {zh ? "欢迎使用出海舰deeptutor" : "Welcome to 出海舰deeptutor"}
+            {zh ? "欢迎使用 chuhaijiandeeptutor" : "Welcome to chuhaijiandeeptutor"}
           </h1>
           <p className="mt-4 max-w-2xl text-sm leading-7 text-[var(--muted-foreground)] sm:text-base">
             {zh

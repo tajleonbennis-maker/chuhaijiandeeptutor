@@ -49,7 +49,7 @@ function LoginPageContent() {
       {/* Logo / Title */}
       <div className="text-center mb-8">
         <h1 className="font-serif text-2xl font-semibold text-[var(--foreground)] tracking-tight">
-          出海舰deeptutor
+          chuhaijiandeeptutor
         </h1>
         <p className="mt-1 text-sm text-[var(--muted-foreground)]">
           {t("Sign in to your account")}
@@ -154,7 +154,7 @@ function LoginPageContent() {
       </Link>
 
       <p className="mt-3 text-center text-xs text-[var(--muted-foreground)]">
-        出海舰deeptutor · Agent-Native Learning
+        chuhaijiandeeptutor · Agent-Native Learning
       </p>
     </div>
   );
