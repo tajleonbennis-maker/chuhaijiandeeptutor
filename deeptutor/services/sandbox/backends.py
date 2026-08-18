@@ -49,9 +49,21 @@ class RunnerSidecarBackend(SandboxBackend):
 
     level = IsolationLevel.SYSTEM
 
-    def __init__(self, base_url: str, *, connect_timeout_s: float = 5.0) -> None:
+    def __init__(
+        self,
+        base_url: str,
+        *,
+        connect_timeout_s: float = 5.0,
+        token: str = "",
+    ) -> None:
         self._base_url = base_url.rstrip("/")
         self._connect_timeout_s = connect_timeout_s
+        self._token = token
+
+    def _headers(self) -> dict[str, str]:
+        if self._token:
+            return {"X-Runner-Token": self._token}
+        return {}
 
     async def exec(self, request: ExecRequest) -> ExecResult:
         payload = {
@@ -86,7 +98,9 @@ class RunnerSidecarBackend(SandboxBackend):
         )
         try:
             async with httpx.AsyncClient(timeout=http_timeout) as client:
-                resp = await client.post(f"{self._base_url}/exec", json=payload)
+                resp = await client.post(
+                    f"{self._base_url}/exec", json=payload, headers=self._headers()
+                )
                 resp.raise_for_status()
                 data = resp.json()
         except httpx.HTTPError as exc:
@@ -102,7 +116,7 @@ class RunnerSidecarBackend(SandboxBackend):
     async def health(self) -> tuple[bool, str]:
         try:
             async with httpx.AsyncClient(timeout=self._connect_timeout_s) as client:
-                resp = await client.get(f"{self._base_url}/health")
+                resp = await client.get(f"{self._base_url}/health", headers=self._headers())
                 resp.raise_for_status()
             return True, "runner reachable"
         except httpx.HTTPError as exc:
@@ -125,6 +139,12 @@ class BwrapBackend(SandboxBackend):
             "--die-with-parent",
             "--unshare-all",
             "--new-session",
+            # SECURITY: start from an empty environment. Without this, bwrap
+            # inherits the app process's full env — including AUTH_PASSWORD_HASH,
+            # POCKETBASE_ADMIN_PASSWORD and provider API keys — so an escaped
+            # command could `env` them out. Each allowed var is then injected
+            # explicitly via --setenv below (whitelist approach).
+            "--clearenv",
             "--proc",
             "/proc",
             "--dev",
@@ -140,7 +160,12 @@ class BwrapBackend(SandboxBackend):
             argv += [flag, mount.host_path, mount.sandbox_path]
         if request.workdir:
             argv += ["--chdir", request.workdir]
-        for key, value in request.env.items():
+        # Ensure a sane PATH even when the caller did not supply one (--clearenv
+        # strips it), so basic tooling still resolves. The whitelisted request
+        # env is then layered on top via --setenv.
+        env: dict[str, str] = {"PATH": "/usr/local/bin:/usr/bin:/bin"}
+        env.update(request.env)
+        for key, value in env.items():
             argv += ["--setenv", key, value]
         if request.argv:
             # No shell in between: bwrap execs the vector directly.
