@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -26,6 +27,61 @@ QUALITY_FLAG_MAP = {
     "medium": "-qm",
     "high": "-qh",
 }
+
+# Environment allowlist for the Manim child. The scene file is LLM-generated
+# code; it must never inherit secrets from the parent (provider API keys,
+# AUTH_PASSWORD_HASH, POCKETBASE_ADMIN_PASSWORD, …). These are the only keys the
+# Manim / ffmpeg / fontconfig toolchain actually needs to render.
+_MANIM_SAFE_ENV_KEYS = (
+    "PATH",
+    "HOME",
+    "LANG",
+    "LC_ALL",
+    "LC_CTYPE",
+    "TMPDIR",
+    "TEMP",
+    "TMP",
+    "USER",
+    "SHELL",
+    "SSL_CERT_FILE",
+    "SSL_CERT_DIR",
+    "REQUESTS_CA_BUNDLE",
+)
+
+
+def _safe_manim_env() -> dict[str, str]:
+    """Return a scrubbed copy of the environment for the Manim subprocess."""
+    return {key: os.environ[key] for key in _MANIM_SAFE_ENV_KEYS if key in os.environ}
+
+
+def _manim_preexec_fn():
+    """Return a ``preexec_fn`` that caps CPU/memory/address-space in the child.
+
+    Applied on POSIX before the Manim interpreter runs. The compose ``mem_limit``
+    and the runner sidecar are the authoritative backstops for the Docker path;
+    this is the belt-and-suspenders guard for the in-process renderer. Returns
+    ``None`` on non-POSIX (rlimits are unavailable there).
+    """
+    import resource
+
+    def _apply() -> None:
+        # Virtual-address-space cap (bytes) — cheap secondary memory guard.
+        try:
+            resource.setrlimit(resource.RLIMIT_AS, (4 * 1024 * 1024 * 1024, 4 * 1024 * 1024 * 1024))
+        except (ValueError, OSError):
+            pass
+        # CPU-time cap (seconds) — bound a runaway render loop.
+        try:
+            resource.setrlimit(resource.RLIMIT_CPU, (600, 600))
+        except (ValueError, OSError):
+            pass
+        # File-descriptor cap.
+        try:
+            resource.setrlimit(resource.RLIMIT_NOFILE, (4096, 4096))
+        except (ValueError, OSError):
+            pass
+
+    return _apply
 
 
 class ManimRenderError(RuntimeError):
@@ -156,10 +212,19 @@ class ManimRenderService:
         # for Windows compatibility (SelectorEventLoop doesn't support
         # asyncio subprocesses). Reader threads + asyncio.Queue preserve
         # real-time streaming output.
+        #
+        # SECURITY: the scene file is LLM-generated Python. It must not inherit
+        # the app's secret-bearing environment (provider API keys, auth password
+        # hash, PocketBase admin creds, …), and its resource usage is capped so a
+        # hostile/malformed scene cannot exhaust the app process. POSIX gets both
+        # a scrubbed env and rlimits; non-POSIX (Windows dev) gets the scrubbed
+        # env only.
         process = subprocess.Popen(
             command,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
+            env=_safe_manim_env(),
+            preexec_fn=_manim_preexec_fn() if os.name == "posix" else None,
         )
 
         _SENTINEL = None
