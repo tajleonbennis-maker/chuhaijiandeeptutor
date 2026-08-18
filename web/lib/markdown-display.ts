@@ -222,11 +222,46 @@ export function safeDecodeURIComponent(value: string): string {
 }
 
 function sanitizeAllowedHtmlTag(tag: string): string {
-  return tag
+  const stripped = tag
     .replace(HTML_EVENT_ATTR_REGEX, "")
     .replace(HTML_STYLE_ATTR_REGEX, "")
     .replace(HTML_SRCDOC_ATTR_REGEX, "")
     .replace(HTML_UNSAFE_URL_ATTR_REGEX, "");
+
+  // Entity-encoding bypass: an attacker can spell the dangerous tokens as
+  // HTML entities (e.g. `java&#115;cript:`, `on&#x6c;oad=`, `sty&#108;e=`) so
+  // the literal regexes above never match, yet the HTML parser decodes them
+  // back before the browser acts on them. Decode and re-scan; if anything
+  // dangerous survives, drop the whole tag rather than risk executing it.
+  // `String#search` ignores the global flag / lastIndex, so this is safe on
+  // the shared `g`-flagged regexes.
+  const decoded = decodeHtmlEntities(stripped);
+  if (
+    decoded.search(HTML_EVENT_ATTR_REGEX) !== -1 ||
+    decoded.search(HTML_STYLE_ATTR_REGEX) !== -1 ||
+    decoded.search(HTML_SRCDOC_ATTR_REGEX) !== -1 ||
+    decoded.search(HTML_UNSAFE_URL_ATTR_REGEX) !== -1
+  ) {
+    return "";
+  }
+  return stripped;
+}
+
+// Decodes numeric character references (&#123; and &#x1f;) so the entity-encoded
+// bypass above is caught. Named entities are left as-is; the dangerous tokens we
+// scan for are always encodable with numeric references.
+const HTML_NUMERIC_ENTITY_REGEX = /&#(?:x([0-9a-fA-F]+)|([0-9]+));/g;
+
+function decodeHtmlEntities(value: string): string {
+  return value.replace(HTML_NUMERIC_ENTITY_REGEX, (match, hex: string | undefined, dec: string) => {
+    const code = hex ? parseInt(hex, 16) : parseInt(dec, 10);
+    if (!Number.isFinite(code)) return match;
+    try {
+      return String.fromCodePoint(code);
+    } catch {
+      return match;
+    }
+  });
 }
 
 function escapeUnknownHtmlTags(content: string): string {
