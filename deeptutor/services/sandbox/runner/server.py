@@ -61,6 +61,8 @@ Mounts note:
 from __future__ import annotations
 
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import hashlib
+import hmac
 import json
 import os
 import resource
@@ -71,6 +73,15 @@ from typing import Any
 
 # Port to listen on inside the container; overridable for local testing.
 DEFAULT_PORT = 8900
+
+# Shared secret used to authenticate the main app against this sidecar.
+# When set, every request (including GET /health) must carry a matching
+# ``X-Runner-Token`` header (or ``Authorization: Bearer <token>``). This closes
+# the "any container on the bridge network can POST /exec" hole: only the main
+# app process, which holds the same env var, can drive execution.
+# When unset (local dev / bare metal), the runner refuses to start — a silent
+# unauthenticated /exec is never acceptable in a shared network.
+RUNNER_TOKEN = os.environ.get("DEEPTUTOR_RUNNER_TOKEN", "").strip()
 
 # Hard cap on the request body we are willing to read, to avoid a hostile or
 # buggy caller exhausting memory before we even parse the command.
@@ -104,6 +115,11 @@ def _truncate_head_tail(text: str, max_chars: int) -> str:
     half = max_chars // 2
     dropped = len(text) - max_chars
     return text[:half] + f"\n\n... ({dropped:,} chars truncated) ...\n\n" + text[-half:]
+
+
+def _constant_time_equal(a: str, b: str) -> bool:
+    """Constant-time string comparison (no early exit on first mismatch)."""
+    return hmac.compare_digest(a.encode("utf-8"), b.encode("utf-8"))
 
 
 def _build_preexec_fn(memory_mb: int, cpu_seconds: int):
@@ -301,6 +317,20 @@ class _Handler(BaseHTTPRequestHandler):
     def log_message(self, format: str, *args: Any) -> None:  # noqa: A002
         sys.stdout.write("runner: " + (format % args) + "\n")
 
+    def _authorized(self) -> bool:
+        """Return True when the request carries the configured shared token.
+
+        Uses a constant-time comparison to avoid leaking the token via timing.
+        When no token is configured the request is always rejected (fail closed).
+        """
+        if not RUNNER_TOKEN:
+            return False
+        provided = self.headers.get("X-Runner-Token") or ""
+        auth_header = self.headers.get("Authorization") or ""
+        if not provided and auth_header.lower().startswith("bearer "):
+            provided = auth_header[7:].strip()
+        return _constant_time_equal(provided, RUNNER_TOKEN)
+
     def _send_json(self, status: int, body: dict[str, Any]) -> None:
         data = json.dumps(body).encode("utf-8")
         self.send_response(status)
@@ -311,6 +341,9 @@ class _Handler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:  # noqa: N802 - http.server naming
         if self.path.rstrip("/") == "/health" or self.path == "/":
+            if not self._authorized():
+                self._send_json(401, _error_result("unauthorized"))
+                return
             body = b"ok"
             self.send_response(200)
             self.send_header("Content-Type", "text/plain")
@@ -323,6 +356,9 @@ class _Handler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:  # noqa: N802 - http.server naming
         if self.path.rstrip("/") != "/exec":
             self._send_json(404, _error_result("not found"))
+            return
+        if not self._authorized():
+            self._send_json(401, _error_result("unauthorized"))
             return
         try:
             length = int(self.headers.get("Content-Length", "0"))
@@ -353,6 +389,12 @@ class _Handler(BaseHTTPRequestHandler):
 
 def main() -> None:
     """Start the threaded HTTP server, binding 0.0.0.0:$RUNNER_PORT."""
+    if not RUNNER_TOKEN:
+        sys.stderr.write(
+            "runner: DEEPTUTOR_RUNNER_TOKEN is not set; refusing to start an "
+            "unauthenticated exec server\n"
+        )
+        sys.exit(1)
     try:
         port = int(os.environ.get("RUNNER_PORT", "") or DEFAULT_PORT)
     except ValueError:
