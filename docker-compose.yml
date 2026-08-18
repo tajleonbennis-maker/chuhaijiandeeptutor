@@ -81,6 +81,10 @@ services:
       # this unset: the app degrades to bwrap (Linux, if installed) or, only when
       # DEEPTUTOR_SANDBOX_ALLOW_SUBPROCESS=1, a restricted subprocess.
       - DEEPTUTOR_SANDBOX_RUNNER_URL=http://sandbox-runner:8900
+      # Shared secret authenticating the app against the runner sidecar. The
+      # runner refuses to start without it, and every /exec request must carry
+      # it. Generate a fresh value per deployment.
+      - DEEPTUTOR_RUNNER_TOKEN=${DEEPTUTOR_RUNNER_TOKEN:?DEEPTUTOR_RUNNER_TOKEN must be set}
 
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:${DEEPTUTOR_DOCKER_BACKEND_PORT:-8001}/"]
@@ -115,6 +119,11 @@ services:
       dockerfile: Dockerfile.runner
     container_name: deeptutor-sandbox-runner
     restart: unless-stopped
+
+    environment:
+      # Shared secret the runner requires on every request. Must match the
+      # DEEPTUTOR_RUNNER_TOKEN passed to the main `deeptutor` service above.
+      - DEEPTUTOR_RUNNER_TOKEN=${DEEPTUTOR_RUNNER_TOKEN:?DEEPTUTOR_RUNNER_TOKEN must be set}
 
     # Share the task workspaces at the SAME paths as the main app so the mount
     # contract holds: a request with host_path == sandbox_path under
