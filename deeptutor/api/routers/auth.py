@@ -352,14 +352,21 @@ async def require_admin(
     FastAPI dependency that requires the caller to be an admin.
 
     Raises HTTP 403 if the authenticated user is not an admin.
-    When AUTH_ENABLED=false, all requests are treated as admin.
+
+    When AUTH_ENABLED=false there is no authenticated identity at all, so no
+    caller can prove admin rights: we reject rather than synthesize a local
+    admin. This closes the "auth disabled ⇒ every request is admin" hole.
+    Deployments that want an admin must enable auth (default) and log in.
 
     ``async def`` mirrors ``require_auth`` so the dependency chain stays on
     the event loop and the user ContextVar set by ``require_auth`` is visible
     to the endpoint.
     """
     if not AUTH_ENABLED:
-        return _local_admin_token_payload()
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access requires authentication. Enable auth and log in as an administrator.",
+        )
 
     if payload is None or payload.role != "admin":
         raise HTTPException(
