@@ -7,6 +7,7 @@ Handles knowledge base CRUD operations, file uploads, and initialization.
 
 import asyncio
 from datetime import datetime
+import ipaddress
 import json
 import logging
 import mimetypes
@@ -14,7 +15,9 @@ import os
 from pathlib import Path
 import re
 import shutil
+import socket
 import traceback
+from urllib.parse import urlparse
 from uuid import uuid4
 
 from fastapi import (
@@ -80,6 +83,78 @@ log_dir = config.get("paths", {}).get("user_log_dir") or config.get("logging", {
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+# ---------------------------------------------------------------------------
+# SSRF guard for user-supplied server URLs (LightRAG server, PageIndex, …).
+# ---------------------------------------------------------------------------
+def _is_disallowed_ip(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
+    if (
+        ip.is_private
+        or ip.is_loopback
+        or ip.is_link_local
+        or ip.is_multicast
+        or ip.is_reserved
+        or ip.is_unspecified
+    ):
+        return True
+    # CGNAT (RFC 6598) 100.64.0.0/10 — not covered by ``is_private``.
+    if isinstance(ip, ipaddress.IPv4Address) and ip in ipaddress.ip_network("100.64.0.0/10"):
+        return True
+    # IPv4-mapped IPv6 form of a disallowed IPv4 address.
+    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
+        return _is_disallowed_ip(ip.ipv4_mapped)
+    return False
+
+
+def _is_private_host(host: str) -> bool:
+    """Return True when ``host`` resolves to a private/loopback/metadata address.
+
+    Used to block SSRF via the LightRAG server URL and PageIndex base URL — a
+    user-supplied ``server_url``/``api_base_url`` must point at a public host,
+    never at the app's own internal network, cloud metadata (169.254.169.254),
+    or other loopback services. Mirrors the logic in ``deeptutor/tools/web_fetch.py``.
+    """
+    candidate = (host or "").strip().strip("[]")
+    if not candidate:
+        return True
+    try:
+        ip = ipaddress.ip_address(candidate)
+        return _is_disallowed_ip(ip)
+    except ValueError:
+        pass
+    lower = candidate.lower()
+    if lower in {"localhost", "ip6-localhost", "ip6-loopback"}:
+        return True
+    if lower.endswith(".local"):
+        return True
+    try:
+        infos = socket.getaddrinfo(candidate, None)
+    except OSError:
+        return True
+    for info in infos:
+        addr = info[4][0]
+        try:
+            if _is_disallowed_ip(ipaddress.ip_address(addr)):
+                return True
+        except ValueError:
+            continue
+    return False
+
+
+def _require_public_url(value: str, field: str) -> None:
+    """Reject ``value`` (an http/https URL) if its host is private/internal."""
+    if not value:
+        return
+    parsed = urlparse(value)
+    if parsed.scheme.lower() not in {"http", "https"}:
+        raise HTTPException(status_code=400, detail=f"{field} must use http:// or https://.")
+    host = (parsed.hostname or "").strip()
+    if not host or _is_private_host(host):
+        raise HTTPException(
+            status_code=400,
+            detail=f"{field} points to a private or internal host, which is not allowed.",
+        )
 
 # Constants for byte conversions
 BYTES_PER_GB = 1024**3
@@ -1111,6 +1186,7 @@ async def update_pageindex_pipeline_config(payload: PageIndexConfigUpdate):
         api_base_url = current.get("api_base_url") or DEFAULT_API_BASE_URL
         if payload.api_base_url is not None and payload.api_base_url.strip():
             api_base_url = payload.api_base_url.strip()
+        _require_public_url(api_base_url, "api_base_url")
 
         service.save_pageindex({"api_key": api_key, "api_base_url": api_base_url})
 
@@ -1638,6 +1714,7 @@ async def probe_lightrag_server_route(payload: ProbeLightRagServerRequest):
     server_url = (payload.server_url or "").strip()
     if not server_url:
         raise HTTPException(status_code=400, detail="server_url is required.")
+    _require_public_url(server_url, "server_url")
     result = await probe_server(server_url, payload.api_key or "")
     return result.to_dict()
 
@@ -1657,6 +1734,7 @@ async def connect_lightrag_server_route(payload: ConnectLightRagServerRequest):
     server_url = (payload.server_url or "").strip()
     if not name or not server_url:
         raise HTTPException(status_code=400, detail="Both name and server_url are required.")
+    _require_public_url(server_url, "server_url")
 
     result = await probe_server(server_url, payload.api_key or "")
     if not result.ok:
