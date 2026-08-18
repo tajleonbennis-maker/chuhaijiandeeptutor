@@ -29,7 +29,7 @@ import logging
 import re
 import socket
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
 import httpx
 
@@ -40,6 +40,7 @@ MAX_RESPONSE_BYTES = 4 * 1024 * 1024  # 4 MB — safety cap on raw download
 DEFAULT_TIMEOUT_S = 15.0
 DEFAULT_USER_AGENT = "DeepTutor/1.0 (+https://hkuds.dev/deeptutor)"
 ALLOWED_SCHEMES = {"http", "https"}
+MAX_REDIRECTS = 5
 
 # Cheap inline HTML → text. Good enough for blog / docs / arxiv abstract
 # pages. For JS-heavy SPAs the tool will return the bare HTML scaffold —
@@ -108,26 +109,62 @@ async def fetch_url_as_markdown(
     try:
         async with factory(timeout=timeout_s, user_agent=user_agent) as client:
             try:
-                async with client.stream(
-                    "GET",
-                    url_clean,
-                    headers={"User-Agent": user_agent, "Accept": "text/html,*/*;q=0.5"},
-                    follow_redirects=True,
-                ) as response:
-                    final_url = str(response.url)
-                    final_host = (urlparse(final_url).hostname or "").strip()
-                    if final_host and validator(final_host):
+                # Follow redirects manually (not ``follow_redirects=True``) so
+                # every intermediate hop is host-validated, not just the final
+                # URL. An attacker-controlled first hop to a public host that
+                # 302s to 169.254.169.254 would otherwise slip past the
+                # post-redirect check. We re-check scheme + host at each hop.
+                current_url = url_clean
+                raw = ""
+                for _ in range(MAX_REDIRECTS + 1):
+                    hop_parsed = urlparse(current_url)
+                    hop_host = (hop_parsed.hostname or "").strip()
+                    if hop_parsed.scheme.lower() not in ALLOWED_SCHEMES:
                         return FetchOutcome(
                             ok=False,
-                            error=f"Redirect to private/loopback host blocked: {final_host}.",
+                            error=f"Redirect to unsupported scheme blocked: {hop_parsed.scheme or '(empty)'}.",
                         )
-                    if response.status_code >= 400:
+                    if hop_host and validator(hop_host):
                         return FetchOutcome(
                             ok=False,
-                            url=final_url,
-                            error=f"HTTP {response.status_code} from {final_url}.",
+                            error=f"Refusing to fetch private/loopback host: {hop_host}.",
                         )
-                    raw = await _bounded_read(response, MAX_RESPONSE_BYTES)
+                    async with client.stream(
+                        "GET",
+                        current_url,
+                        headers={"User-Agent": user_agent, "Accept": "text/html,*/*;q=0.5"},
+                        follow_redirects=False,
+                    ) as response:
+                        if response.status_code in (301, 302, 303, 307, 308):
+                            location = response.headers.get("location")
+                            if not location:
+                                return FetchOutcome(
+                                    ok=False,
+                                    url=str(response.url),
+                                    error=f"Redirect ({response.status_code}) without a Location header.",
+                                )
+                            current_url = urljoin(current_url, location)
+                            continue
+                        final_url = str(response.url)
+                        final_host = (urlparse(final_url).hostname or "").strip()
+                        if final_host and validator(final_host):
+                            return FetchOutcome(
+                                ok=False,
+                                error=f"Redirect to private/loopback host blocked: {final_host}.",
+                            )
+                        if response.status_code >= 400:
+                            return FetchOutcome(
+                                ok=False,
+                                url=final_url,
+                                error=f"HTTP {response.status_code} from {final_url}.",
+                            )
+                        raw = await _bounded_read(response, MAX_RESPONSE_BYTES)
+                        break
+                else:
+                    return FetchOutcome(
+                        ok=False,
+                        error=f"Too many redirects (>{MAX_REDIRECTS}).",
+                    )
             except httpx.HTTPError as exc:
                 return FetchOutcome(ok=False, error=f"Network error: {exc}")
     except Exception as exc:  # pragma: no cover — defensive
@@ -192,14 +229,25 @@ def _is_disallowed_host(host: str) -> bool:
 
 
 def _is_disallowed_ip(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
-    return (
+    if (
         ip.is_private
         or ip.is_loopback
         or ip.is_link_local
         or ip.is_multicast
         or ip.is_reserved
         or ip.is_unspecified
-    )
+    ):
+        return True
+    # CGNAT (RFC 6598) 100.64.0.0/10 — not covered by ``is_private``. This is
+    # the shared-address space used by some cloud/ISP middleboxes and can reach
+    # internal network segments; it must be blocked like the private ranges.
+    if isinstance(ip, ipaddress.IPv4Address):
+        if ip in ipaddress.ip_network("100.64.0.0/10"):
+            return True
+    # IPv4-mapped IPv6 form of a disallowed IPv4 address (e.g. ::ffff:127.0.0.1).
+    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
+        return _is_disallowed_ip(ip.ipv4_mapped)
+    return False
 
 
 async def _bounded_read(response: httpx.Response, limit: int) -> str:
