@@ -1008,10 +1008,19 @@ async def partner_chat_ws(ws: WebSocket, partner_id: str):
     * ``{"type": "done"}`` / ``{"type": "error"}`` / ``{"type": "proactive"}``.
     """
     from deeptutor.api.routers.auth import ws_auth_failed, ws_require_auth
-    from deeptutor.multi_user.context import reset_current_user
+    from deeptutor.multi_user.context import get_current_user, reset_current_user
 
     user_token = await ws_require_auth(ws)
     if user_token is ws_auth_failed:
+        return
+
+    # SECURITY: this router is mounted with ``dependencies=_admin``, but FastAPI
+    # does NOT apply router-level ``Depends(require_admin)`` to WebSocket
+    # endpoints — only the in-body ``ws_require_auth`` above runs. That would let
+    # any authenticated non-admin drive a partner bot. Enforce admin here
+    # explicitly (partners live in the shared admin workspace data/partners).
+    if not get_current_user().is_admin:
+        await ws.close(code=4403, reason="Admin access required")
         return
 
     mgr = get_partner_manager()
