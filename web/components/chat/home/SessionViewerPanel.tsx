@@ -1038,7 +1038,13 @@ function WebTabBody({ url }: { url: string }) {
           title={host}
           onLoad={() => setLoaded(true)}
           className="h-full w-full border-0"
-          sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+          // SECURITY: deliberately omit `allow-same-origin`. Combined with
+          // `allow-scripts` it would let a page served from the app's own
+          // origin (e.g. a backend-inlined HTML attachment at /api/outputs/…)
+          // run script with the app's cookies/storage — a session-hijack
+          // vector. Without it the frame runs in an opaque origin, so even a
+          // same-origin HTML preview cannot touch the app session.
+          sandbox="allow-scripts allow-forms allow-popups"
           referrerPolicy="no-referrer"
         />
         {!loaded && !timedOut ? (
